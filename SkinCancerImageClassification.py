@@ -1,102 +1,92 @@
-#Rifat Rahman Hridhoy
-#ID: 10402885
+# Author: Rifat Rahman Hridhoy
+# ID: 10402885
+
 """
 Skin cancer lesion classification using the HAM10000 dataset
 
 Dataset link:
 https://www.kaggle.com/kmader/skin-cancer-mnist-ham10000
 
-
-Data description:
-The 7 classes of skin cancer lesions included in this dataset are:
-Melanocytic nevi (nv)
-Melanoma (mel)
-Benign keratosis-like lesions (bkl)
-Basal cell carcinoma (bcc) 
-Actinic keratoses (akiec)
-Vascular lesions (vas)
-Dermatofibroma (df)
+The dataset contains 7 classes of skin cancer lesions:
+- Melanocytic nevi (nv)
+- Melanoma (mel)
+- Benign keratosis-like lesions (bkl)
+- Basal cell carcinoma (bcc) 
+- Actinic keratoses (akiec)
+- Vascular lesions (vas)
+- Dermatofibroma (df)
 """
 
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import os
+# ----------------- Import Libraries -----------------
+import matplotlib.pyplot as plt   # For plotting graphs/images
+import numpy as np                # For numerical operations
+import pandas as pd               # For handling CSV dataset
+import os                         # For file path operations
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-import keras
-import tensorflow as tf
-from glob import glob
-import seaborn as sns
-from PIL import Image
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppress TensorFlow warnings
 
-np.random.seed(42)
-#Fixes random seed for reproducibility (ensures same shuffling every run).
+import keras                      # Deep learning library
+import tensorflow as tf           # Backend for Keras
+from glob import glob             # For file searching
+import seaborn as sns             # Advanced data visualization
+from PIL import Image             # For image processing
 
-from sklearn.metrics import confusion_matrix
+np.random.seed(42)  # Fix random seed for reproducibility
 
-import keras
-from tensorflow.keras.utils import to_categorical  # used for converting labels to one-hot-encoding
-from keras.models import Sequential
-from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPool2D, BatchNormalization
-from sklearn.model_selection import train_test_split
-from scipy import stats
-from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import confusion_matrix  # For model evaluation
+from tensorflow.keras.utils import to_categorical  # Converts labels to one-hot encoding
+from keras.models import Sequential           # Sequential model type
+from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPool2D  # Layers for CNN
+from sklearn.model_selection import train_test_split  # Train-test split
+from sklearn.preprocessing import LabelEncoder       # Converts text labels to numbers
+from sklearn.utils import resample                   # For balancing dataset
 
-skin_df = pd.read_csv(r"C:\Users\Rahma\Downloads\archive\HAM10000_metadata.csv")
+# ----------------- Load Dataset -----------------
+skin_df = pd.read_csv(r"C:\Users\Rahma\Downloads\archive\HAM10000_metadata.csv")  # Load metadata
 
-#Defines image size (32×32)
-SIZE = 32
+SIZE = 32  # Resize images to 32x32
 
-# label encoding to numeric values from text
-le = LabelEncoder() #converts string labels (nv, mel, etc.) into integers.
-le.fit(skin_df['dx'])              #le.classes_ shows mapping between original labels and encoded integers.
-LabelEncoder()
-print(list(le.classes_))
+# ----------------- Encode Labels -----------------
+le = LabelEncoder()                 # Initialize encoder
+le.fit(skin_df['dx'])               # Fit on lesion type column
+print(list(le.classes_))            # Print mapping (nv→0, mel→1, etc.)
+skin_df['label'] = le.transform(skin_df["dx"])  # Create new numeric label column
+print(skin_df.sample(10))           # Print 10 random rows
 
-skin_df['label'] = le.transform(skin_df["dx"])
-print(skin_df.sample(10))
+# ----------------- Data Visualization -----------------
+fig = plt.figure(figsize=(12, 8))   # Create figure
 
-# Data distribution visualization
-fig = plt.figure(figsize=(12, 8))
-
-
-#Creates a figure with custom size.
+# Lesion type distribution
 ax1 = fig.add_subplot(221)
 skin_df['dx'].value_counts().plot(kind='bar', ax=ax1)
 ax1.set_ylabel('Count')
-ax1.set_title('Cell Type');
+ax1.set_title('Cell Type')
 
-#First subplot: distribution of lesion types.
+# Sex distribution
 ax2 = fig.add_subplot(222)
 skin_df['sex'].value_counts().plot(kind='bar', ax=ax2)
-ax2.set_ylabel('Count', size=15)
-ax2.set_title('Sex');
+ax2.set_ylabel('Count')
+ax2.set_title('Sex')
 
-#Second subplot: distribution of male vs. female.
+# Localization (body part) distribution
 ax3 = fig.add_subplot(223)
 skin_df['localization'].value_counts().plot(kind='bar')
-ax3.set_ylabel('Count', size=12)
+ax3.set_ylabel('Count')
 ax3.set_title('Localization')
 
-#Fourth subplot: distribution of patient ages.
+# Age distribution
 ax4 = fig.add_subplot(224)
-sample_age = skin_df[pd.notnull(skin_df['age'])]
-sns.displot(sample_age['age'], kde=True, color='red', stat="density");
+sample_age = skin_df[pd.notnull(skin_df['age'])]  # Drop rows with missing ages
+sns.displot(sample_age['age'], kde=True, color='red', stat="density")
 ax4.set_title('Age')
 
 plt.tight_layout()
 plt.show()
 
-# Distribution of data into various classes
-from sklearn.utils import resample
+# ----------------- Balance Dataset -----------------
+print(skin_df['label'].value_counts())  # Show imbalance before resampling
 
-print(skin_df['label'].value_counts())#Shows class distribution (imbalanced dataset).
-
-#Balance data.
-# Many ways to balance data... you can also try assigning weights during model.fit
-#Separate each classes, resample, and combine back into single dataframe, Splits dataset into separate DataFrames by label.
-
+# Separate data by class
 df_0 = skin_df[skin_df['label'] == 0]
 df_1 = skin_df[skin_df['label'] == 1]
 df_2 = skin_df[skin_df['label'] == 2]
@@ -105,7 +95,7 @@ df_4 = skin_df[skin_df['label'] == 4]
 df_5 = skin_df[skin_df['label'] == 5]
 df_6 = skin_df[skin_df['label'] == 6]
 
-#Resamples each class to 500 samples (upsampling minority classes).
+# Resample each class to 500 samples
 n_samples = 500
 df_0_balanced = resample(df_0, replace=True, n_samples=n_samples, random_state=42)
 df_1_balanced = resample(df_1, replace=True, n_samples=n_samples, random_state=42)
@@ -115,35 +105,26 @@ df_4_balanced = resample(df_4, replace=True, n_samples=n_samples, random_state=4
 df_5_balanced = resample(df_5, replace=True, n_samples=n_samples, random_state=42)
 df_6_balanced = resample(df_6, replace=True, n_samples=n_samples, random_state=42)
 
-#Combined back to a single dataframe
-skin_df_balanced = pd.concat([df_0_balanced, df_1_balanced,
-                              df_2_balanced, df_3_balanced,
-                              df_4_balanced, df_5_balanced, df_6_balanced])
+# Combine all balanced subsets
+skin_df_balanced = pd.concat([df_0_balanced, df_1_balanced, df_2_balanced,
+                              df_3_balanced, df_4_balanced, df_5_balanced, df_6_balanced])
+print(skin_df_balanced['label'].value_counts())  # Verify balanced dataset
 
-#Check the distribution. All classes should be balanced now.
-print(skin_df_balanced['label'].value_counts())
-
-#Now time to read images based on image ID from the CSV file
-#This is the safest way to read images as it ensures the right image is read for the right ID
+# ----------------- Load Images -----------------
+# Map image_id → file path
 image_path = {os.path.splitext(os.path.basename(x))[0]: x
-              for x in
-              glob(os.path.join(r"C:\Users\Rahma\Downloads\HAM10000\HAM10000_images_part_*/*.jpg"))}
+              for x in glob(os.path.join(r"C:\Users\Rahma\Downloads\HAM10000\HAM10000_images_part_*/*.jpg"))}
 
-#Define the path and add as a new column
+# Add path column
 skin_df_balanced['path'] = skin_df['image_id'].map(image_path.get)
-#Use the path to read images.
-#skin_df_balanced['image'] = skin_df_balanced['path'].map(lambda x: np.asarray(Image.open(x).resize((SIZE, SIZE))))
-from tqdm import tqdm
-from PIL import Image
-import numpy as np
-import os
 
+# Load and resize images
 images = []
-for path in tqdm(skin_df_balanced['path']):
+for path in skin_df_balanced['path']:
     if os.path.exists(path):
         try:
-            img = Image.open(path).resize((SIZE, SIZE))
-            images.append(np.asarray(img))
+            img = Image.open(path).resize((SIZE, SIZE))  # Resize to 32x32
+            images.append(np.asarray(img))               # Convert to array
         except Exception as e:
             print(f"Error loading {path}: {e}")
             images.append(None)
@@ -151,10 +132,13 @@ for path in tqdm(skin_df_balanced['path']):
         print(f"File not found: {path}")
         images.append(None)
 
-skin_df_balanced['image'] = images
-n_samples = 5  # number of samples for plotting
-# Plotting
+skin_df_balanced['image'] = images  # Add images column
+
+# ----------------- Sample Visualization -----------------
+n_samples = 5
 fig, m_axs = plt.subplots(7, n_samples, figsize=(4 * n_samples, 3 * 7))
+
+# Show 5 random images from each class
 for n_axs, (type_name, type_rows) in zip(m_axs,
                                          skin_df_balanced.sort_values(['dx']).groupby('dx')):
     n_axs[0].set_title(type_name)
@@ -162,46 +146,44 @@ for n_axs, (type_name, type_rows) in zip(m_axs,
         c_ax.imshow(c_row['image'])
         c_ax.axis('off')
 
-#Convert dataframe column of images into numpy array
-X = np.asarray(skin_df_balanced['image'].tolist())
-X = X / 255.  # Scale values to 0-1. You can also used standardscaler or other scaling methods.
-Y = skin_df_balanced['label']  #Assign label values to Y
-Y_cat = to_categorical(Y, num_classes=7)  #Convert to categorical as this is a multiclass classification problem
-#Split to training and testing
+# ----------------- Data Preparation -----------------
+X = np.asarray(skin_df_balanced['image'].tolist())  # Convert list to NumPy array
+X = X / 255.0                                       # Normalize to [0,1]
+Y = skin_df_balanced['label']                       # Labels
+Y_cat = to_categorical(Y, num_classes=7)            # One-hot encoding
+
+# Train-test split (75/25)
 x_train, x_test, y_train, y_test = train_test_split(X, Y_cat, test_size=0.25, random_state=42)
 
-#Define the model.
-#I've used autokeras to find out the best model for this problem.
-#You can also load pretrained networks such as mobilenet or VGG16
-
-num_classes = 7
-
+# ----------------- CNN Model -----------------
 model = Sequential()
+
+# Conv layer 1
 model.add(Conv2D(256, (3, 3), activation="relu", input_shape=(SIZE, SIZE, 3)))
-#model.add(BatchNormalization())
 model.add(MaxPool2D(pool_size=(2, 2)))
 model.add(Dropout(0.3))
 
+# Conv layer 2
 model.add(Conv2D(128, (3, 3), activation='relu'))
-#model.add(BatchNormalization())
 model.add(MaxPool2D(pool_size=(2, 2)))
 model.add(Dropout(0.3))
 
+# Conv layer 3
 model.add(Conv2D(64, (3, 3), activation='relu'))
-#model.add(BatchNormalization())
 model.add(MaxPool2D(pool_size=(2, 2)))
 model.add(Dropout(0.3))
+
+# Flatten + Fully connected layers
 model.add(Flatten())
+model.add(Dense(32))                          # Hidden dense layer
+model.add(Dense(7, activation='softmax'))     # Output layer (7 classes)
 
-model.add(Dense(32))
-model.add(Dense(7, activation='softmax'))
-model.summary()
+model.summary()  # Print model summary
 
+# Compile model
 model.compile(loss='categorical_crossentropy', optimizer='Adam', metrics=['acc'])
 
-# Train
-#You can also use generator to use augmentation during training.
-
+# ----------------- Train Model -----------------
 batch_size = 16
 epochs = 50
 
@@ -212,10 +194,12 @@ history = model.fit(
     validation_data=(x_test, y_test),
     verbose=2)
 
+# Evaluate model
 score = model.evaluate(x_test, y_test)
 print('Test accuracy:', score[1])
 
-#plot the training and validation accuracy and loss at each epoch
+# ----------------- Training Curves -----------------
+# Loss curves
 loss = history.history['loss']
 val_loss = history.history['val_loss']
 epochs = range(1, len(loss) + 1)
@@ -227,6 +211,7 @@ plt.ylabel('Loss')
 plt.legend()
 plt.show()
 
+# Accuracy curves
 acc = history.history['acc']
 val_acc = history.history['val_acc']
 plt.plot(epochs, acc, 'y', label='Training acc')
@@ -237,22 +222,21 @@ plt.ylabel('Accuracy')
 plt.legend()
 plt.show()
 
-# Prediction on test data
+# ----------------- Model Evaluation -----------------
+# Predictions
 y_pred = model.predict(x_test)
-# Convert predictions classes to one hot vectors 
-y_pred_classes = np.argmax(y_pred, axis=1)
-# Convert test data to one hot vectors
-y_true = np.argmax(y_test, axis=1)
+y_pred_classes = np.argmax(y_pred, axis=1)  # Convert probabilities → class index
+y_true = np.argmax(y_test, axis=1)          # Convert one-hot → class index
 
-#Print confusion matrix
+# Confusion matrix
 cm = confusion_matrix(y_true, y_pred_classes)
-
 fig, ax = plt.subplots(figsize=(6, 6))
 sns.set(font_scale=1.6)
 sns.heatmap(cm, annot=True, linewidths=.5, ax=ax)
 
-#PLot fractional incorrect misclassifications
+# Incorrect prediction fraction
 incorr_fraction = 1 - np.diag(cm) / np.sum(cm, axis=1)
 plt.bar(np.arange(7), incorr_fraction)
 plt.xlabel('True Label')
 plt.ylabel('Fraction of incorrect predictions')
+plt.show()
