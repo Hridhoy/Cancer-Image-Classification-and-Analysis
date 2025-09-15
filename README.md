@@ -68,22 +68,3 @@ These models are for research and educational purposes only.
 They should not be used as standalone diagnostic tools.
 
 Clinical deployment requires regulatory approval, ethical validation, and large-scale clinical trials.
-
-📑 Supporting Material
-
-📄 IEEE-style Research Paper
-
-🎞 Presentation Slides
-
-🤝 Contributions
-
-Pull requests and suggestions are welcome! Please fork the repo and submit a PR with improvements.
-
-📧 Contact
-
-Created by Your Name
-
-MSc Computer Science
-
-LinkedIn
- | Email
